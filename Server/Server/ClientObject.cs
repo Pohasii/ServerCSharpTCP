@@ -9,6 +9,7 @@ public class ClientObject
 {
     protected internal string Id { get; private set; }
     protected internal NetworkStream Stream { get; private set; }
+
     string userName;
     TcpClient client;
     Server server; 

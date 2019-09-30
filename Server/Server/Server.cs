@@ -29,7 +29,7 @@ public class Server
     {
         try
         {
-            tcpListener = new TcpListener(IPAddress.Any, 8888);
+            tcpListener = new TcpListener(IPAddress.Any, 55443);
             tcpListener.Start();
             Console.WriteLine("Server started...");
 
