@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Net.Sockets;
 using System.Text;
 
 public class ClientObject
 {
+  
     public NetworkStream Stream { get; private set; }
-
     TcpClient client;
     Server server;
 
