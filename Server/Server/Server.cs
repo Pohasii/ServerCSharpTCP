@@ -1,31 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+
+public struct NetworkEvent
+{
+    public ClientObject sender;
+    public string message;
+}
 
 public class Server
 {
-    static TcpListener tcpListener; // сервер для прослушивания
-    List<ClientObject> clients = new List<ClientObject>(); // все подключения
+    TcpListener tcpListener;
+    Dictionary<int, ClientObject> clients = new Dictionary<int, ClientObject>();
 
-    protected internal void AddConnection(ClientObject clientObject)
+    int clientsId;
+
+    Dictionary<int, Action<NetworkEvent>> networkEvents = new Dictionary<int, Action<NetworkEvent>>();
+
+    void OnOtherPlayerConected(NetworkEvent e)
     {
-        clients.Add(clientObject);
+        var client = e.sender;
+
+        client.UserName = e.message;
+
+        var msg = client.UserName + " connected";
+        Console.WriteLine(client.Id + " " + msg);
+        BroadcastMessage(0, msg, client.Id);
     }
-    protected internal void RemoveConnection(string id)
-    {
-        // получаем по id закрытое подключение
-        ClientObject client = clients.FirstOrDefault(c => c.Id == id);
-        // и удаляем его из списка подключений
-        if (client != null)
-            clients.Remove(client);
-    }
-    // прослушивание входящих подключений
-    protected internal async void ListenAsync()
+
+    public async void Start()
     {
         try
         {
@@ -33,11 +39,17 @@ public class Server
             tcpListener.Start();
             Console.WriteLine("Server started...");
 
+            new Chat(this);
+            On(0, OnOtherPlayerConected);
+
             while (true)
             {
                 var tcpClient = await tcpListener.AcceptTcpClientAsync();
 
-                ClientObject clientObject = new ClientObject(tcpClient, this);
+                var clientObject = new ClientObject(clientsId, tcpClient, this);
+
+                clients.Add(clientsId, clientObject);
+                clientsId++;
 
                 Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
                 clientThread.Start();
@@ -50,27 +62,89 @@ public class Server
         }
     }
 
-    // трансляция сообщения подключенным клиентам
-    protected internal void BroadcastMessage(string message, string id)
+    public void RemoveConnection(int id)
     {
-        byte[] data = Encoding.Unicode.GetBytes(message);
-        for (int i = 0; i < clients.Count; i++)
+        clients.Remove(id);
+    }
+
+    public void On(int type, Action<NetworkEvent> action)
+    {
+        if (networkEvents.TryGetValue(type, out var act))
         {
-            if (clients[i].Id != id) // если id клиента не равно id отправляющего
+            act += action;
+        }
+        else
+        {
+            networkEvents.Add(type, action);
+        }
+    }
+
+    public void Off(int type, Action<NetworkEvent> action)
+    {
+        if (networkEvents.TryGetValue(type, out var act))
+        {
+            act -= action;
+        }
+    }
+
+    public void Send(int type, string message, int id)
+    {
+        var msg = ConstructMessage(type, message);
+
+        byte[] data = Encoding.Unicode.GetBytes(msg);
+
+        clients[id].Stream.Write(data, 0, data.Length);
+    }
+
+    public void BroadcastMessage(int type, string message, int id)
+    {
+        var msg = ConstructMessage(type, message);
+
+        byte[] data = Encoding.Unicode.GetBytes(msg);
+
+        foreach (var item in clients)
+        {
+            if (item.Key != id)
             {
-                clients[i].Stream.Write(data, 0, data.Length); //передача данных
+                item.Value.Stream.Write(data, 0, data.Length);
             }
         }
     }
-    // отключение всех клиентов
-    protected internal void Disconnect()
+
+    public void ReciveMessage(ClientObject client, string message)
     {
-        tcpListener.Stop(); //остановка сервера
+        var (type, msg) = DeConstructMessage(message);
+
+        if (networkEvents.TryGetValue(type, out var action))
+        {
+            var netEvent = new NetworkEvent { sender = client, message = msg };
+            action.Invoke(netEvent);
+        }
+    }
+
+    (int type, string msg) DeConstructMessage(string msg)
+    {
+        var splitMsg = msg.Split(new[] { ',' });
+
+        var type = int.Parse(splitMsg[0]);
+        var message = splitMsg[1];
+
+        return (type, message);
+    }
+
+    string ConstructMessage(int type, string message)
+    {
+        return type + "," + message;
+    }
+
+    public void Disconnect()
+    {
+        tcpListener.Stop();
 
         for (int i = 0; i < clients.Count; i++)
         {
-            clients[i].Close(); //отключение клиента
+            clients[i].Close();
         }
-        Environment.Exit(0); //завершение процесса
+        Environment.Exit(0);
     }
 }

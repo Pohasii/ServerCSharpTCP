@@ -1,55 +1,42 @@
-﻿using System;
-using System.IO;
+using System;
 using System.Net.Sockets;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
-using Newtonsoft.Json;
 
 public class ClientObject
 {
-    protected internal string Id { get; private set; }
-    protected internal NetworkStream Stream { get; private set; }
-
-    string userName;
+  
+    public NetworkStream Stream { get; private set; }
     TcpClient client;
-    Server server; 
+    Server server;
 
-    public ClientObject(TcpClient tcpClient, Server serverObject)
+    public int Id { get; private set; }
+    public string UserName { get; set; }
+
+    public ClientObject(int id, TcpClient tcpClient, Server serverObject)
     {
-        Id = Guid.NewGuid().ToString();
+        Id = id;
         client = tcpClient;
         server = serverObject;
-        serverObject.AddConnection(this);
+        Stream = client.GetStream();
     }
 
     public void Process()
     {
         try
         {
-            Stream = client.GetStream();
-           
-            string message = GetMessage();
-            userName = message;
-
-            message = userName + " join the chat";
-
-            server.BroadcastMessage(message, this.Id);
-            Console.WriteLine(message);
-
             while (true)
             {
                 try
                 {
-                    message = GetMessage();
-                    message = String.Format("{0}: {1}", userName, message);
-                    Console.WriteLine(message);
-                    server.BroadcastMessage(message, this.Id);
+                    var message = GetMessage();
+
+                    server.ReciveMessage(this, message);
                 }
                 catch
                 {
-                    message = String.Format("{0}: leave the chat", userName);
+                    var message = string.Format("{0}: leave the chat", UserName);
                     Console.WriteLine(message);
-                    server.BroadcastMessage(message, this.Id);
+                    server.BroadcastMessage(1, message, Id);
                     break;
                 }
             }
@@ -60,16 +47,14 @@ public class ClientObject
         }
         finally
         {
-            // � ������ ������ �� ����� ��������� �������
-            server.RemoveConnection(this.Id);
+            server.RemoveConnection(Id);
             Close();
         }
     }
 
-    // ������ ��������� ��������� � �������������� � ������
-    private string GetMessage()
+    string GetMessage()
     {
-        byte[] data = new byte[256]; // ����� ��� ���������� ������
+        byte[] data = new byte[56];
         StringBuilder builder = new StringBuilder();
         int bytes = 0;
         do
@@ -82,8 +67,7 @@ public class ClientObject
         return builder.ToString();
     }
 
-    // �������� �����������
-    protected internal void Close()
+    public void Close()
     {
         if (Stream != null)
             Stream.Close();

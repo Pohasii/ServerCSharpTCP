@@ -9,7 +9,7 @@ class Program
         try
         {
             server = new Server();
-            server.ListenAsync();
+            server.Start();
             Console.ReadLine();
         }
         catch (Exception ex)
