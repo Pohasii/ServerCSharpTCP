@@ -18,8 +18,6 @@ public class Server
 
     int clientsId;
 
-
-
     Dictionary<int, Action<NetworkEvent>> networkEvents = new Dictionary<int, Action<NetworkEvent>>();
 
     void OnOtherPlayerConected(NetworkEvent e)
@@ -41,7 +39,7 @@ public class Server
             tcpListener.Start();
             Console.WriteLine("Server started...");
 
-            new DataBases(this);
+            new Authentication(this);
             new Chat(this);
             On(0, OnOtherPlayerConected);
 
