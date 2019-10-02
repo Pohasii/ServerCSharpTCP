@@ -18,6 +18,8 @@ public class Server
 
     int clientsId;
 
+
+
     Dictionary<int, Action<NetworkEvent>> networkEvents = new Dictionary<int, Action<NetworkEvent>>();
 
     void OnOtherPlayerConected(NetworkEvent e)
@@ -39,6 +41,7 @@ public class Server
             tcpListener.Start();
             Console.WriteLine("Server started...");
 
+            new DataBases(this);
             new Chat(this);
             On(0, OnOtherPlayerConected);
 
@@ -48,8 +51,6 @@ public class Server
 
                 var clientObject = new ClientObject(clientsId, tcpClient, this);
 
-                clients.Add(clientsId, clientObject);
-                clientsId++;
 
                 Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
                 clientThread.Start();
@@ -60,6 +61,11 @@ public class Server
             Console.WriteLine(ex.Message);
             Disconnect();
         }
+    }
+
+    public void AddConnection (ClientObject client) {
+        clients.Add(clientsId, client);
+        clientsId++;
     }
 
     public void RemoveConnection(int id)
